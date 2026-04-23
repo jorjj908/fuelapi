@@ -79,26 +79,39 @@ export async function getAccessToken(clientId: string, clientSecret: string): Pr
   return token;
 }
 
-async function fetchAllBatches<T>(baseUrl: string, token: string): Promise<T[]> {
+async function fetchAllBatches<T>(baseUrl: string, token: string, label: string): Promise<T[]> {
   const out: T[] = [];
   for (let batch = 1; batch <= MAX_BATCHES; batch++) {
-    const res = await fetch(`${baseUrl}?batch-number=${batch}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}?batch-number=${batch}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (res.status === 404) {
+      console.log(`[${label}] finished at batch ${batch - 1} (${out.length} records)`);
+      break;
+    }
     if (!res.ok) {
-      throw new Error(`Batch ${batch} from ${baseUrl} failed: ${res.status} ${await res.text()}`);
+      throw new Error(`[${label}] batch ${batch} failed: ${res.status} ${await res.text()}`);
     }
     const data = (await res.json()) as T[];
     if (!Array.isArray(data) || data.length === 0) break;
     out.push(...data);
+    if (batch % 5 === 0) console.log(`[${label}] batch ${batch} done (${out.length} records so far)`);
   }
   return out;
 }
 
 export function fetchAllStationInfo(token: string): Promise<StationInfo[]> {
-  return fetchAllBatches<StationInfo>(INFO_URL, token);
+  return fetchAllBatches<StationInfo>(INFO_URL, token, 'info');
 }
 
 export function fetchAllStationPrices(token: string): Promise<StationPrices[]> {
-  return fetchAllBatches<StationPrices>(PRICES_URL, token);
+  return fetchAllBatches<StationPrices>(PRICES_URL, token, 'prices');
 }
