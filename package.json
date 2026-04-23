@@ -1,17 +1,14 @@
 {
   "name": "hull-fuel-daily",
   "version": "1.0.0",
-  "description": "Daily Azure Function that emails the cheapest petrol within 15 miles of Hull",
-  "main": "dist/src/functions/*.js",
+  "description": "Daily job that emails the cheapest petrol within 15 miles of Hull",
   "scripts": {
     "build": "tsc",
-    "watch": "tsc -w",
     "clean": "rimraf dist",
-    "prestart": "npm run clean && npm run build",
-    "start": "func start"
+    "start": "node dist/src/run.js",
+    "run-once": "npm run clean && npm run build && npm start"
   },
   "dependencies": {
-    "@azure/functions": "^4.5.0",
     "resend": "^4.0.1"
   },
   "devDependencies": {

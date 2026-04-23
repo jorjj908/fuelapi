@@ -1,7 +1,6 @@
 node_modules/
 dist/
-local.settings.json
-.vscode/
+.env
+.env.local
 *.log
-bin/
-obj/
+.vscode/

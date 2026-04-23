@@ -1,12 +1,11 @@
-import { app, InvocationContext, Timer } from '@azure/functions';
 import {
   fetchAllStationInfo,
   fetchAllStationPrices,
   getAccessToken,
   StationInfo,
-} from '../fuelFinder';
-import { HULL_LAT, HULL_LON, haversineMiles } from '../filter';
-import { RankedStation, sendFuelEmail } from '../email';
+} from './fuelFinder';
+import { HULL_LAT, HULL_LON, haversineMiles } from './filter';
+import { RankedStation, sendFuelEmail } from './email';
 
 const RADIUS_MILES = 15;
 const FUELS_TO_REPORT = ['E10', 'E5', 'B7_Standard'] as const;
@@ -17,25 +16,25 @@ interface Nearby {
   distance_miles: number;
 }
 
-export async function dailyFuelEmail(_timer: Timer, context: InvocationContext): Promise<void> {
+async function main(): Promise<void> {
   const clientId = requireEnv('FUEL_CLIENT_ID');
   const clientSecret = requireEnv('FUEL_CLIENT_SECRET');
   const resendKey = requireEnv('RESEND_API_KEY');
   const mailFrom = requireEnv('MAIL_FROM');
   const mailTo = requireEnv('MAIL_TO');
 
-  context.log('Requesting access token');
+  console.log('Requesting access token');
   const token = await getAccessToken(clientId, clientSecret);
 
-  context.log('Fetching PFS info + prices');
+  console.log('Fetching PFS info + prices');
   const [info, prices] = await Promise.all([
     fetchAllStationInfo(token),
     fetchAllStationPrices(token),
   ]);
-  context.log(`Fetched ${info.length} forecourts, ${prices.length} price records`);
+  console.log(`Fetched ${info.length} forecourts, ${prices.length} price records`);
 
   const nearby = filterNearby(info);
-  context.log(`${nearby.size} open forecourts within ${RADIUS_MILES} mi of Hull`);
+  console.log(`${nearby.size} open forecourts within ${RADIUS_MILES} mi of Hull`);
 
   const priceByNode = new Map(prices.map((p) => [p.node_id, p]));
 
@@ -73,7 +72,7 @@ export async function dailyFuelEmail(_timer: Timer, context: InvocationContext):
     cheapestByFuel,
     generatedAt: new Date(),
   });
-  context.log('Email sent');
+  console.log('Email sent');
 }
 
 function filterNearby(info: StationInfo[]): Map<string, Nearby> {
@@ -94,8 +93,7 @@ function requireEnv(name: string): string {
   return v;
 }
 
-app.timer('dailyFuelEmail', {
-  schedule: '0 0 7 * * *',
-  handler: dailyFuelEmail,
-  runOnStartup: false,
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });
