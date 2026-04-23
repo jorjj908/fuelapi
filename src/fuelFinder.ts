@@ -39,29 +39,29 @@ export interface StationInfo {
 }
 
 interface TokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
+  success: boolean;
+  data?: {
+    access_token: string;
+    token_type: string;
+    expires_in: number;
+    refresh_token?: string;
+  };
+  message?: string;
 }
 
 export async function getAccessToken(clientId: string, clientSecret: string): Promise<string> {
-  const body = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: clientId,
-    client_secret: clientSecret,
-    scope: 'fuelfinder.read',
-  });
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
   });
   if (!res.ok) {
     throw new Error(`Token request failed: ${res.status} ${await res.text()}`);
   }
-  const data = (await res.json()) as TokenResponse;
-  if (!data.access_token) throw new Error('Token response missing access_token');
-  return data.access_token;
+  const body = (await res.json()) as TokenResponse;
+  const token = body.data?.access_token;
+  if (!token) throw new Error(`Token response missing access_token: ${JSON.stringify(body)}`);
+  return token;
 }
 
 async function fetchAllBatches<T>(baseUrl: string, token: string): Promise<T[]> {
