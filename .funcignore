@@ -1,0 +1,6 @@
+.git*
+*.ts
+tsconfig.json
+.vscode
+local.settings.json
+local.settings.json.example
