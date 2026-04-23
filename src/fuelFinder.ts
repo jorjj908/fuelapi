@@ -52,15 +52,30 @@ interface TokenResponse {
 export async function getAccessToken(clientId: string, clientSecret: string): Promise<string> {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'User-Agent': 'hull-fuel-daily/1.0',
+    },
     body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
   });
+  const text = await res.text();
   if (!res.ok) {
-    throw new Error(`Token request failed: ${res.status} ${await res.text()}`);
+    const headerSummary = ['content-type', 'server', 'cf-ray', 'x-amz-cf-id', 'www-authenticate']
+      .map((h) => `${h}=${res.headers.get(h) ?? ''}`)
+      .join(' ');
+    throw new Error(
+      `Token request failed: ${res.status} ${res.statusText} | headers: ${headerSummary} | body: ${text.slice(0, 500)}`,
+    );
   }
-  const body = (await res.json()) as TokenResponse;
+  let body: TokenResponse;
+  try {
+    body = JSON.parse(text) as TokenResponse;
+  } catch {
+    throw new Error(`Token response was not JSON: ${text.slice(0, 500)}`);
+  }
   const token = body.data?.access_token;
-  if (!token) throw new Error(`Token response missing access_token: ${JSON.stringify(body)}`);
+  if (!token) throw new Error(`Token response missing access_token: ${text.slice(0, 500)}`);
   return token;
 }
 
