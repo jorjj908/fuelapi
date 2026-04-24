@@ -36,7 +36,7 @@ function buildSubject(byFuel: Record<string, RankedStation[]>): string {
 const FUEL_LABELS: Record<string, string> = {
   E10: 'E10 (unleaded)',
   E5: 'E5 (super unleaded)',
-  B7_Standard: 'Diesel (B7 standard)',
+  B7_STANDARD: 'Diesel (B7 standard)',
 };
 
 function renderHtml(byFuel: Record<string, RankedStation[]>, at: Date): string {

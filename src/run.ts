@@ -8,7 +8,7 @@ import { HULL_LAT, HULL_LON, haversineMiles } from './filter';
 import { RankedStation, sendFuelEmail } from './email';
 
 const RADIUS_MILES = 15;
-const FUELS_TO_REPORT = ['E10', 'E5', 'B7_Standard'] as const;
+const FUELS_TO_REPORT = ['E10', 'E5', 'B7_STANDARD'] as const;
 const TOP_N = 5;
 
 interface Nearby {
@@ -31,10 +31,6 @@ async function main(): Promise<void> {
   console.log('Fetching PFS prices');
   const prices = await fetchAllStationPrices(token);
   console.log(`Fetched ${info.length} forecourts, ${prices.length} price records`);
-
-  const seenFuels = new Set<string>();
-  for (const p of prices) for (const fp of p.fuel_prices ?? []) seenFuels.add(fp.fuel_type);
-  console.log(`Unique fuel_type values in response: ${JSON.stringify([...seenFuels].sort())}`);
 
   const nearby = filterNearby(info);
   console.log(`${nearby.size} open forecourts within ${RADIUS_MILES} mi of Hull`);
