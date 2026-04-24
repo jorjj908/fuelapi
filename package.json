@@ -9,9 +9,11 @@
     "run-once": "npm run clean && npm run build && npm start"
   },
   "dependencies": {
+    "better-sqlite3": "^12.9.0",
     "resend": "^4.0.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
     "rimraf": "^5.0.5",
     "typescript": "^5.4.0"

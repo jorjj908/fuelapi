@@ -8,6 +8,7 @@ export interface RankedStation {
   distance_miles: number;
   price_pence: number;
   price_last_updated?: string;
+  delta_pence?: number | null;
 }
 
 export async function sendFuelEmail(opts: {
@@ -52,7 +53,7 @@ function renderHtml(byFuel: Record<string, RankedStation[]>, at: Date): string {
               <td>${escape(r.trading_name)}${r.brand ? ` <span style="color:#666">(${escape(r.brand)})</span>` : ''}</td>
               <td>${escape(r.address)}${r.postcode ? `, ${escape(r.postcode)}` : ''}</td>
               <td align="right">${r.distance_miles.toFixed(1)} mi</td>
-              <td align="right"><b>${r.price_pence.toFixed(1)}p</b></td>
+              <td align="right"><b>${r.price_pence.toFixed(1)}p</b>${renderDelta(r.delta_pence)}</td>
             </tr>`,
         )
         .join('');
@@ -75,6 +76,13 @@ function renderHtml(byFuel: Record<string, RankedStation[]>, at: Date): string {
       ${sections}
       <p style="color:#999;font-size:12px;margin-top:24px">Data: UK Gov Fuel Finder PFS feed.</p>
     </div>`;
+}
+
+function renderDelta(delta: number | null | undefined): string {
+  if (delta == null) return '';
+  if (Math.abs(delta) < 0.05) return ` <span style="color:#888;font-size:12px">(=)</span>`;
+  if (delta > 0) return ` <span style="color:#c00;font-size:12px">(↑ ${delta.toFixed(1)}p)</span>`;
+  return ` <span style="color:#0a7c3c;font-size:12px">(↓ ${Math.abs(delta).toFixed(1)}p)</span>`;
 }
 
 function escape(s: string | undefined): string {
