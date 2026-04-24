@@ -26,11 +26,10 @@ async function main(): Promise<void> {
   console.log('Requesting access token');
   const token = await getAccessToken(clientId, clientSecret);
 
-  console.log('Fetching PFS info + prices');
-  const [info, prices] = await Promise.all([
-    fetchAllStationInfo(token),
-    fetchAllStationPrices(token),
-  ]);
+  console.log('Fetching PFS info');
+  const info = await fetchAllStationInfo(token);
+  console.log('Fetching PFS prices');
+  const prices = await fetchAllStationPrices(token);
   console.log(`Fetched ${info.length} forecourts, ${prices.length} price records`);
 
   const nearby = filterNearby(info);

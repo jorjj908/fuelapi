@@ -79,20 +79,37 @@ export async function getAccessToken(clientId: string, clientSecret: string): Pr
   return token;
 }
 
-async function fetchAllBatches<T>(baseUrl: string, token: string, label: string): Promise<T[]> {
-  const out: T[] = [];
-  for (let batch = 1; batch <= MAX_BATCHES; batch++) {
+const BATCH_TIMEOUT_MS = 90_000;
+const BATCH_RETRIES = 2;
+
+async function fetchBatch(url: string, token: string): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= BATCH_RETRIES; attempt++) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
-    let res: Response;
+    const timeout = setTimeout(() => controller.abort(), BATCH_TIMEOUT_MS);
     try {
-      res = await fetch(`${baseUrl}?batch-number=${batch}`, {
+      return await fetch(url, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         signal: controller.signal,
       });
+    } catch (err) {
+      lastErr = err;
+      if (attempt < BATCH_RETRIES) {
+        const backoff = 2000 * (attempt + 1);
+        console.log(`  fetch failed (${(err as Error).message}), retrying in ${backoff}ms`);
+        await new Promise((r) => setTimeout(r, backoff));
+      }
     } finally {
       clearTimeout(timeout);
     }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+async function fetchAllBatches<T>(baseUrl: string, token: string, label: string): Promise<T[]> {
+  const out: T[] = [];
+  for (let batch = 1; batch <= MAX_BATCHES; batch++) {
+    const res = await fetchBatch(`${baseUrl}?batch-number=${batch}`, token);
     if (res.status === 404) {
       console.log(`[${label}] finished at batch ${batch - 1} (${out.length} records)`);
       break;
