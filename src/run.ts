@@ -1,4 +1,5 @@
 import {
+  ApiUnavailableError,
   fetchAllStationInfo,
   fetchAllStationPrices,
   getAccessToken,
@@ -120,6 +121,11 @@ function requireEnv(name: string): string {
 }
 
 main().catch((err) => {
+  if (err instanceof ApiUnavailableError) {
+    console.error(`Fuel-finder API unavailable today: ${err.message}`);
+    console.error('Skipping this run. Will retry tomorrow.');
+    process.exit(0);
+  }
   console.error(err);
   process.exit(1);
 });

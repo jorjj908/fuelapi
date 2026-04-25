@@ -80,7 +80,15 @@ export async function getAccessToken(clientId: string, clientSecret: string): Pr
 }
 
 const BATCH_TIMEOUT_MS = 90_000;
-const BATCH_RETRIES = 2;
+const BATCH_RETRIES = 3;
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+
+export class ApiUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ApiUnavailableError';
+  }
+}
 
 async function fetchBatch(url: string, token: string): Promise<Response> {
   let lastErr: unknown;
@@ -88,14 +96,25 @@ async function fetchBatch(url: string, token: string): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), BATCH_TIMEOUT_MS);
     try {
-      return await fetch(url, {
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         signal: controller.signal,
       });
+      if (RETRYABLE_STATUS.has(res.status) && attempt < BATCH_RETRIES) {
+        const backoff = 5000 * (attempt + 1);
+        console.log(`  ${res.status} from API, retrying in ${backoff}ms (attempt ${attempt + 1}/${BATCH_RETRIES})`);
+        await new Promise((r) => setTimeout(r, backoff));
+        continue;
+      }
+      if (RETRYABLE_STATUS.has(res.status)) {
+        throw new ApiUnavailableError(`API returned ${res.status} after ${BATCH_RETRIES} retries`);
+      }
+      return res;
     } catch (err) {
+      if (err instanceof ApiUnavailableError) throw err;
       lastErr = err;
       if (attempt < BATCH_RETRIES) {
-        const backoff = 2000 * (attempt + 1);
+        const backoff = 5000 * (attempt + 1);
         console.log(`  fetch failed (${(err as Error).message}), retrying in ${backoff}ms`);
         await new Promise((r) => setTimeout(r, backoff));
       }
