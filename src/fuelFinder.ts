@@ -50,33 +50,46 @@ interface TokenResponse {
 }
 
 export async function getAccessToken(clientId: string, clientSecret: string): Promise<string> {
-  const res = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'User-Agent': 'hull-fuel-daily/1.0',
-    },
-    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    const headerSummary = ['content-type', 'server', 'cf-ray', 'x-amz-cf-id', 'www-authenticate']
-      .map((h) => `${h}=${res.headers.get(h) ?? ''}`)
-      .join(' ');
-    throw new Error(
-      `Token request failed: ${res.status} ${res.statusText} | headers: ${headerSummary} | body: ${text.slice(0, 500)}`,
-    );
+  const TOKEN_RETRIES = 5;
+  let lastError = '';
+  for (let attempt = 0; attempt <= TOKEN_RETRIES; attempt++) {
+    const res = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'hull-fuel-daily/1.0',
+      },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
+    });
+    const text = await res.text();
+    if (RETRYABLE_STATUS.has(res.status) && attempt < TOKEN_RETRIES) {
+      const backoff = Math.min(60_000, 10_000 * Math.pow(1.5, attempt));
+      console.log(`  token: ${res.status}, retrying in ${Math.round(backoff / 1000)}s (attempt ${attempt + 1}/${TOKEN_RETRIES})`);
+      await new Promise((r) => setTimeout(r, backoff));
+      continue;
+    }
+    if (!res.ok) {
+      if (RETRYABLE_STATUS.has(res.status)) {
+        throw new ApiUnavailableError(`Token endpoint returned ${res.status} after ${TOKEN_RETRIES} retries`);
+      }
+      const headerSummary = ['content-type', 'server', 'cf-ray', 'x-amz-cf-id', 'www-authenticate']
+        .map((h) => `${h}=${res.headers.get(h) ?? ''}`)
+        .join(' ');
+      lastError = `${res.status} ${res.statusText} | headers: ${headerSummary} | body: ${text.slice(0, 500)}`;
+      throw new Error(`Token request failed: ${lastError}`);
+    }
+    let body: TokenResponse;
+    try {
+      body = JSON.parse(text) as TokenResponse;
+    } catch {
+      throw new Error(`Token response was not JSON: ${text.slice(0, 500)}`);
+    }
+    const token = body.data?.access_token;
+    if (!token) throw new Error(`Token response missing access_token: ${text.slice(0, 500)}`);
+    return token;
   }
-  let body: TokenResponse;
-  try {
-    body = JSON.parse(text) as TokenResponse;
-  } catch {
-    throw new Error(`Token response was not JSON: ${text.slice(0, 500)}`);
-  }
-  const token = body.data?.access_token;
-  if (!token) throw new Error(`Token response missing access_token: ${text.slice(0, 500)}`);
-  return token;
+  throw new ApiUnavailableError(`Token endpoint exhausted retries: ${lastError}`);
 }
 
 const BATCH_TIMEOUT_MS = 90_000;
